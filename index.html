@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Learning Maze Solver</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        input, select {
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .maze-section, .training-section {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .maze-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .maze {
+            display: inline-grid;
+            grid-template-columns: repeat(5, 60px);
+            grid-template-rows: repeat(5, 60px);
+            gap: 2px;
+            border: 3px solid #4a5568;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f7fafc;
+            margin-bottom: 20px;
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cell.free {
+            background: #e6fffa;
+            color: #285e61;
+        }
+        
+        .cell.wall {
+            background: #2d3748;
+            color: white;
+        }
+        
+        .cell.start {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        .cell.goal {
+            background: linear-gradient(135deg, #ed8936, #dd6b20);
+            color: white;
+            animation: glow 2s infinite;
+        }
+        
+        .cell.path {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            animation: pathHighlight 0.5s ease-in-out;
+        }
+        
+        .cell.agent {
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+            color: white;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(237, 137, 54, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(237, 137, 54, 0.8); }
+        }
+        
+        @keyframes pathHighlight {
+            from { transform: scale(0.8); opacity: 0.6; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            60% { transform: translateY(-3px); }
+        }
+        
+        .info-panel {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .info-panel h3 {
+            margin-top: 0;
+            color: #4a5568;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .stat {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+        
+        .path-display {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .path-step {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .maze {
+                grid-template-columns: repeat(5, 45px);
+                grid-template-rows: repeat(5, 45px);
+            }
+            
+            .cell {
+                width: 45px;
+                height: 45px;
+                font-size: 14px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Q-Learning Maze Solver</h1>
+        
+        <div class="controls">
+            <button id="trainBtn">Start Training</button>
+            <button id="stopBtn" disabled>Stop Training</button>
+            <button id="showPathBtn" disabled>Show Optimal Path</button>
+            <button id="animateBtn" disabled>Animate Agent</button>
+            <button id="resetBtn">Reset</button>
+            
+            <label>Learning Rate: <input type="number" id="learningRate" value="0.1" min="0.01" max="1" step="0.01"></label>
+            <label>Epsilon: <input type="number" id="epsilon" value="0.1" min="0" max="1" step="0.01"></label>
+            <label>Episodes: <input type="number" id="maxEpisodes" value="1000" min="100" max="5000" step="100"></label>
+        </div>
+        
+        <div class="main-content">
+            <div class="maze-section">
+                <div class="maze-container">
+                    <h2>5×5 Maze Environment</h2>
+                    <div class="maze" id="maze"></div>
+                    
+                    <div class="info-panel">
+                        <h3>Environment Info</h3>
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value" id="currentEpisode">0</div>
+                                <div class="stat-label">Episode</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="totalSteps">0</div>
+                                <div class="stat-label">Total Steps</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="successRate">0%</div>
+                                <div class="stat-label">Success Rate</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="avgReward">0.0</div>
+                                <div class="stat-label">Avg Reward</div>
+                            </div>
+                        </div>
+                        
+                        <div class="path-display" id="pathDisplay">
+                            <strong>Optimal Path:</strong> Training not started
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="training-section">
+                <h2>Training Progress</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="trainingStatus">Ready</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="bestReward">0.0</div>
+                        <div class="stat-label">Best Reward</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="convergenceEpisode">-</div>
+                        <div class="stat-label">Converged At</div>
+                    </div>
+                </div>
+                
+                <div class="info-panel">
+                    <h3>Reward Function</h3>
+                    <ul>
+                        <li>+10: Reaching goal (G)</li>
+                        <li>-1: Each step taken</li>
+                        <li>-10: Hitting a wall</li>
+                    </ul>
+                    
+                    <h3>Q-Learning Parameters</h3>
+                    <ul>
+                        <li>Discount Factor (γ): 0.9</li>
+                        <li>Actions: Up, Down, Left, Right</li>
+                        <li>State Space: 25 cells (5×5 grid)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Training Metrics</h2>
+            <canvas id="rewardChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <script>
+        class MazeEnvironment {
+            constructor() {
+                // Custom 5x5 maze with strategic wall placement
+                this.maze = [
+                    ['S', '0', '1', '0', '0'],
+                    ['0', '1', '0', '1', '0'],
+                    ['0', '0', '0', '1', '0'],
+                    ['1', '1', '0', '0', '0'],
+                    ['0', '0', '0', '1', 'G']
+                ];
+                
+                this.rows = 5;
+                this.cols = 5;
+                this.start = [0, 0];
+                this.goal = [4, 4];
+                this.currentPos = [...this.start];
+                
+                // Actions: 0=up, 1=down, 2=left, 3=right
+                this.actions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                this.actionNames = ['Up', 'Down', 'Left', 'Right'];
+            }
+            
+            reset() {
+                this.currentPos = [...this.start];
+                return this.getState();
+            }
+            
+            getState() {
+                return this.currentPos[0] * this.cols + this.currentPos[1];
+            }
+            
+            isValidPosition(row, col) {
+                return row >= 0 && row < this.rows && 
+                       col >= 0 && col < this.cols && 
+                       this.maze[row][col] !== '1';
+            }
+            
+            step(action) {
+                const [dr, dc] = this.actions[action];
+                const newRow = this.currentPos[0] + dr;
+                const newCol = this.currentPos[1] + dc;
+                
+                let reward = -1; // Step penalty
+                let done = false;
+                
+                if (this.isValidPosition(newRow, newCol)) {
+                    this.currentPos = [newRow, newCol];
+                    
+                    if (newRow === this.goal[0] && newCol === this.goal[1]) {
+                        reward = 10; // Goal reward
+                        done = true;
+                    }
+                } else {
+                    reward = -10; // Wall penalty
+                }
+                
+                return {
+                    nextState: this.getState(),
+                    reward: reward,
+                    done: done
+                };
+            }
+            
+            getValidActions(state) {
+                const row = Math.floor(state / this.cols);
+                const col = state % this.cols;
+                const validActions = [];
+                
+                for (let i = 0; i < this.actions.length; i++) {
+                    const [dr, dc] = this.actions[i];
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+                    
+                    if (this.isValidPosition(newRow, newCol)) {
+                        validActions.push(i);
+                    }
+                }
+                
+                return validActions;
+            }
+        }
+        
+        class QLearningAgent {
+            constructor(numStates, numActions, learningRate = 0.1, discountFactor = 0.9, epsilon = 0.1) {
+                this.numStates = numStates;
+                this.numActions = numActions;
+                this.learningRate = learningRate;
+                this.discountFactor = discountFactor;
+                this.epsilon = epsilon;
+                
+                // Initialize Q-table
+                this.qTable = Array(numStates).fill().map(() => Array(numActions).fill(0));
+            }
+            
+            selectAction(state, validActions) {
+                // Epsilon-greedy action selection
+                if (Math.random() < this.epsilon) {
+                    // Explore: random valid action
+                    return validActions[Math.floor(Math.random() * validActions.length)];
+                } else {
+                    // Exploit: best valid action
+                    let bestAction = validActions[0];
+                    let bestValue = this.qTable[state][bestAction];
+                    
+                    for (const action of validActions) {
+                        if (this.qTable[state][action] > bestValue) {
+                            bestValue = this.qTable[state][action];
+                            bestAction = action;
+                        }
+                    }
+                    
+                    return bestAction;
+                }
+            }
+            
+            updateQValue(state, action, reward, nextState, done) {
+                let maxNextQ = 0;
+                if (!done) {
+                    maxNextQ = Math.max(...this.qTable[nextState]);
+                }
+                
+                const currentQ = this.qTable[state][action];
+                const newQ = currentQ + this.learningRate * 
+                           (reward + this.discountFactor * maxNextQ - currentQ);
+                
+                this.qTable[state][action] = newQ;
+            }
+            
+            getOptimalPath(env) {
+                const path = [];
+                const states = [];
+                let currentState = env.reset();
+                env.reset(); // Reset environment
+                
+                const maxSteps = 50; // Prevent infinite loops
+                let steps = 0;
+                
+                while (steps < maxSteps) {
+                    const row = Math.floor(currentState / env.cols);
+                    const col = currentState % env.cols;
+                    path.push([row, col]);
+                    states.push(currentState);
+                    
+                    if (row === env.goal[0] && col === env.goal[1]) {
+                        break;
+                    }
+                    
+                    const validActions = env.getValidActions(currentState);
+                    if (validActions.length === 0) break;
+                    
+                    // Select best action (no exploration)
+                    let bestAction = validActions[0];
+                    let bestValue = this.qTable[currentState][bestAction];
+                    
+                    for (const action of validActions) {
+                        if (this.qTable[currentState][action] > bestValue) {
+                            bestValue = this.qTable[currentState][action];
+                            bestAction = action;
+                        }
+                    }
+                    
+                    const result = env.step(bestAction);
+                    currentState = result.nextState;
+                    steps++;
+                }
+                
+                return { path, states };
+            }
+        }
+        
+        class MazeVisualizer {
+            constructor() {
+                this.env = new MazeEnvironment();
+                this.agent = new QLearningAgent(25, 4);
+                this.isTraining = false;
+                this.trainingInterval = null;
+                this.animationInterval = null;
+                
+                this.episode = 0;
+                this.totalSteps = 0;
+                this.successCount = 0;
+                this.rewardHistory = [];
+                this.bestReward = -Infinity;
+                this.convergenceEpisode = -1;
+                
+                this.initializeUI();
+                this.setupChart();
+                this.renderMaze();
+            }
+            
+            initializeUI() {
+                document.getElementById('trainBtn').addEventListener('click', () => this.startTraining());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stopTraining());
+                document.getElementById('showPathBtn').addEventListener('click', () => this.showOptimalPath());
+                document.getElementById('animateBtn').addEventListener('click', () => this.animateAgent());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+                
+                // Parameter updates
+                document.getElementById('learningRate').addEventListener('change', (e) => {
+                    this.agent.learningRate = parseFloat(e.target.value);
+                });
+                
+                document.getElementById('epsilon').addEventListener('change', (e) => {
+                    this.agent.epsilon = parseFloat(e.target.value);
+                });
+            }
+            
+            setupChart() {
+                const ctx = document.getElementById('rewardChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Episode Reward',
+                            data: [],
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        }, {
+                            label: 'Moving Average (100)',
+                            data: [],
+                            borderColor: '#764ba2',
+                            backgroundColor: 'transparent',
+                            tension: 0.1,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Training Progress'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Episode'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Reward'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            renderMaze() {
+                const mazeDiv = document.getElementById('maze');
+                mazeDiv.innerHTML = '';
+                
+                for (let i = 0; i < this.env.rows; i++) {
+                    for (let j = 0; j < this.env.cols; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.id = `cell-${i}-${j}`;
+                        
+                        const value = this.env.maze[i][j];
+                        if (value === '0') {
+                            cell.classList.add('free');
+                            cell.textContent = '';
+                        } else if (value === '1') {
+                            cell.classList.add('wall');
+                            cell.textContent = '█';
+                        } else if (value === 'S') {
+                            cell.classList.add('start');
+                            cell.textContent = 'S';
+                        } else if (value === 'G') {
+                            cell.classList.add('goal');
+                            cell.textContent = 'G';
+                        }
+                        
+                        mazeDiv.appendChild(cell);
+                    }
+                }
+            }
+            
+            updateStats() {
+                document.getElementById('currentEpisode').textContent = this.episode;
+                document.getElementById('totalSteps').textContent = this.totalSteps;
+                
+                const successRate = this.episode > 0 ? 
+                    Math.round((this.successCount / this.episode) * 100) : 0;
+                document.getElementById('successRate').textContent = successRate + '%';
+                
+                const avgReward = this.rewardHistory.length > 0 ? 
+                    (this.rewardHistory.reduce((a, b) => a + b, 0) / this.rewardHistory.length).toFixed(2) : '0.0';
+                document.getElementById('avgReward').textContent = avgReward;
+                
+                document.getElementById('bestReward').textContent = this.bestReward.toFixed(2);
+                
+                document.getElementById('convergenceEpisode').textContent = 
+                    this.convergenceEpisode > 0 ? this.convergenceEpisode : '-';
+            }
+            
+            async startTraining() {
+                this.isTraining = true;
+                document.getElementById('trainBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('trainingStatus').textContent = 'Training...';
+                
+                const maxEpisodes = parseInt(document.getElementById('maxEpisodes').value);
+                
+                while (this.isTraining && this.episode < maxEpisodes) {
+                    await this.runEpisode();
+                    
+                    if (this.episode % 10 === 0) {
+                        this.updateChart();
+                        await new Promise(resolve => setTimeout(resolve, 1));
+                    }
+                }
+                
+                if (this.episode >= maxEpisodes) {
+                    this.stopTraining();
+                }
+            }
+            
+            async runEpisode() {
+                let state = this.env.reset();
+                let totalReward = 0;
+                let steps = 0;
+                const maxSteps = 100;
+                
+                while (steps < maxSteps) {
+                    const validActions = this.env.getValidActions(state);
+                    if (validActions.length === 0) break;
+                    
+                    const action = this.agent.selectAction(state, validActions);
+                    const result = this.env.step(action);
+                    
+                    this.agent.updateQValue(state, action, result.reward, result.nextState, result.done);
+                    
+                    state = result.nextState;
+                    totalReward += result.reward;
+                    steps++;
+                    this.totalSteps++;
+                    
+                    if (result.done) {
+                        if (result.reward > 0) {
+                            this.successCount++;
+                        }
+                        break;
+                    }
+                }
+                
+                this.episode++;
+                this.rewardHistory.push(totalReward);
+                
+                if (totalReward > this.bestReward) {
+                    this.bestReward = totalReward;
+                }
+                
+                // Check for convergence (stable performance over last 100 episodes)
+                if (this.episode >= 100 && this.convergenceEpisode === -1) {
+                    const recentRewards = this.rewardHistory.slice(-100);
+                    const avgRecent = recentRewards.reduce((a, b) => a + b, 0) / 100;
+                    const variance = recentRewards.reduce((sum, r) => sum + Math.pow(r - avgRecent, 2), 0) / 100;
+                    
+                    if (variance < 25 && avgRecent > 5) { // Low variance and good performance
+                        this.convergenceEpisode = this.episode;
+                    }
+                }
+                
+                this.updateStats();
+            }
+            
+            stopTraining() {
+                this.isTraining = false;
+                document.getElementById('trainBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('showPathBtn').disabled = false;
+                document.getElementById('animateBtn').disabled = false;
+                document.getElementById('trainingStatus').textContent = 'Complete';
+                
+                this.updateChart();
+                this.displayOptimalPath();
+            }
+            
+            updateChart() {
+                const episodes = Array.from({length: this.rewardHistory.length}, (_, i) => i + 1);
+                
+                // Calculate moving average
+                const movingAvg = [];
+                const windowSize = Math.min(100, this.rewardHistory.length);
+                
+                for (let i = 0; i < this.rewardHistory.length; i++) {
+                    const start = Math.max(0, i - windowSize + 1);
+                    const window = this.rewardHistory.slice(start, i + 1);
+                    const avg = window.reduce((a, b) => a + b, 0) / window.length;
+                    movingAvg.push(avg);
+                }
+                
+                this.chart.data.labels = episodes;
+                this.chart.data.datasets[0].data = this.rewardHistory;
+                this.chart.data.datasets[1].data = movingAvg;
+                this.chart.update('none');
+            }
+            
+            displayOptimalPath() {
+                const result = this.agent.getOptimalPath(this.env);
+                const pathSteps = result.path.map((pos, i) => {
+                    if (i === 0) return `Start(${pos[0]},${pos[1]})`;
+                    if (i === result.path.length - 1) return `Goal(${pos[0]},${pos[1]})`;
+                    return `(${pos[0]},${pos[1]})`;
+                });
+                
+                const pathDisplay = document.getElementById('pathDisplay');
+                pathDisplay.innerHTML = '<strong>Optimal Path:</strong> ' + 
+                    pathSteps.map(step => `<span class="path-step">${step}</span>`).join(' → ');
+            }
+            
+            showOptimalPath() {
+                this.clearPathHighlights();
+                
+                const result = this.agent.getOptimalPath(this.env);
+                const path = result.path;
+                
+                path.forEach((pos, index) => {
+                    setTimeout(() => {
+                        const cell = document.getElementById(`cell-${pos[0]}-${pos[1]}`);
+                        if (cell && !cell.classList.contains('start') && !cell.classList.contains('goal')) {
+                            cell.classList.add('path');
+                            cell.textContent = '•';
+                        }
+                    }, index * 200);
+                });
+            }
+            
+            async animateAgent() {
+                this.clearPathHighlights();
+                this.clearAgentPosition();
+                
+                const result = this.agent.getOptimalPath(this.env);
+                const path = result.path;
+                
+                for (let i = 0; i < path.length; i++) {
+                    const [row, col] = path[i];
+                    const cell = document.getElementById(`cell-${row}-${col}`);
+                    
+                    // Clear previous agent position
+                    if (i > 0) {
+                        const prevCell = document.getElementById(`cell-${path[i-1][0]}-${path[i-1][1]}`);
+                        if (prevCell && !prevCell.classList.contains('start') && !prevCell.classList.contains('goal')) {
+                            prevCell.classList.remove('agent');
+                            prevCell.classList.add('path');
+                            prevCell.textContent = '•';
+                        }
+                    }
+                    
+                    // Add agent to current position
+                    if (cell && !cell.classList.contains('goal')) {
+                        cell.classList.add('agent');
+                        cell.textContent = '🤖';
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
+            }
+            
+            clearPathHighlights() {
+                document.querySelectorAll('.cell.path').forEach(cell => {
+                    cell.classList.remove('path');
+                    cell.textContent = '';
+                });
+            }
+            
+            clearAgentPosition() {
+                document.querySelectorAll('.cell.agent').forEach(cell => {
+                    cell.classList.remove('agent');
+                    if (!cell.classList.contains('start') && !cell.classList.contains('goal')) {
+                        cell.textContent = '';
+                    }
+                });
+            }
+            
+            reset() {
+                this.isTraining = false;
+                clearInterval(this.trainingInterval);
+                clearInterval(this.animationInterval);
+                
+                // Reset environment and agent
+                this.env = new MazeEnvironment();
+                this.agent = new QLearningAgent(25, 4, 
+                    parseFloat(document.getElementById('learningRate').value),
+                    0.9,
+                    parseFloat(document.getElementById('epsilon').value)
+                );
+                
+                // Reset statistics
+                this.episode = 0;
+                this.totalSteps = 0;
+                this.successCount = 0;
+                this.rewardHistory = [];
+                this.bestReward = -Infinity;
+                this.convergenceEpisode = -1;
+                
+                // Reset UI
+                document.getElementById('trainBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('showPathBtn').disabled = true;
+                document.getElementById('animateBtn').disabled = true;
+                document.getElementById('trainingStatus').textContent = 'Ready';
+                document.getElementById('pathDisplay').innerHTML = '<strong>Optimal Path:</strong> Training not started';
+                
+                // Clear visualizations
+                this.clearPathHighlights();
+                this.clearAgentPosition();
+                this.renderMaze();
+                this.updateStats();
+                
+                // Reset chart
+                this.chart.data.labels = [];
+                this.chart.data.datasets[0].data = [];
+                this.chart.data.datasets[1].data = [];
+                this.chart.update();
+            }
+        }
+        
+        // Initialize the application
+        window.addEventListener('DOMContentLoaded', () => {
+            new MazeVisualizer();
+        });
+    </script>
+</body>
+</html>
